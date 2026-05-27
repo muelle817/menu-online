@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Cocina - Muelle 817</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background:#0a0a0a; color:white; margin:0; padding:20px; }
+    h1 { color:#d4af37; text-align:center; margin-bottom:20px; }
+    .order { background:#111; margin:15px 0; padding:20px; border-radius:10px; border-left:5px solid #d4af37; }
+    .complete-btn { background:#e74c3c; color:white; border:none; padding:12px 20px; border-radius:6px; cursor:pointer; float:right; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <h1>🍽️ Panel de Cocina - Muelle 817</h1>
+  <div id="orders"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIDAaZY0g3EQ6a_iPhyt87_3QXj30p6zY",
+      authDomain: "muelle817-c62df.firebaseapp.com",
+      databaseURL: "https://muelle817-c62df-default-rtdb.firebaseio.com",
+      projectId: "muelle817-c62df",
+      storageBucket: "muelle817-c62df.firebasestorage.app",
+      messagingSenderId: "641825272212",
+      appId: "1:641825272212:web:b96a054561398eaf22df81",
+      measurementId: "G-ZC4SS30GFZ"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function loadOrders() {
+      db.ref('pedidos').on('value', snapshot => {
+        const ordersDiv = document.getElementById('orders');
+        ordersDiv.innerHTML = '<h2 style="color:#d4af37;">Pedidos pendientes:</h2>';
+        
+        if (!snapshot.exists()) {
+          ordersDiv.innerHTML += '<p style="text-align:center; color:#888;">No hay pedidos pendientes</p>';
+          return;
+        }
+
+        snapshot.forEach(child => {
+          const order = child.val();
+          let itemsHtml = order.items.map(item => `<li>${item.name} — $${item.price}</li>`).join('');
+          
+          ordersDiv.innerHTML += `
+            <div class="order">
+              <strong>Mesa: ${order.mesa}</strong> — ${order.timestamp}<br>
+              <strong>Total: $${order.total}</strong>
+              <ul>${itemsHtml}</ul>
+              <button class="complete-btn" onclick="completeOrder('${child.key}')">✓ Finalizar Pedido</button>
+            </div>`;
+        });
+      });
+    }
+
+    function completeOrder(orderId) {
+      if (confirm("¿Marcar este pedido como completado y eliminarlo?")) {
+        db.ref('pedidos/' + orderId).remove();
+      }
+    }
+
+    loadOrders();
+  </script>
+</body>
+</html>
