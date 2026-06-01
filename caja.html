@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caja - Burger 817</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+    body { font-family: 'Poppins', sans-serif; background: #0a0a0a; color: white; margin:0; padding:15px; }
+    h1 { color: #ff8c00; }
+    .order { background: #1f1f1f; margin:15px 0; padding:20px; border-radius:16px; border-left:6px solid #eab308; }
+    .mesa { font-size: 1.8rem; font-weight: bold; color: #ff8c00; }
+    .btn-venta { 
+      background: #22c55e; 
+      color: black; 
+      padding:16px; 
+      border:none; 
+      border-radius:12px; 
+      font-weight:bold; 
+      width:100%; 
+      margin-top:10px; 
+    }
+    #ticket-print { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #ticket-print, #ticket-print * { visibility: visible; }
+      #ticket-print { display: block; position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
+    <div class="bg-zinc-900 p-10 rounded-3xl w-full max-w-md">
+      <h1 class="text-5xl font-bold text-center text-orange-500 mb-8">BURGER 817</h1>
+      <h2 class="text-2xl text-center mb-6">Panel de Caja</h2>
+      <input id="username" type="text" value="usuario1" class="w-full px-5 py-4 bg-zinc-800 rounded-2xl mb-4">
+      <input id="password" type="password" placeholder="Contraseña" class="w-full px-5 py-4 bg-zinc-800 rounded-2xl mb-6">
+      <button onclick="login()" class="w-full bg-orange-500 text-black py-4 rounded-2xl font-bold text-lg">
+        INICIAR SESIÓN
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN SCREEN -->
+  <div id="main-screen" class="hidden">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">💰 CAJA - Burger 817</h1>
+      <button onclick="logout()" class="bg-red-600 px-6 py-2 rounded-xl">Cerrar Sesión</button>
+    </div>
+
+    <h2 class="text-xl mt-8 mb-4 text-green-400">📌 Pedidos Listos</h2>
+    <div id="pedidos-listos"></div>
+
+    <h2 class="text-xl mt-12 mb-4 text-gray-400">📊 Historial de Ventas</h2>
+    <div id="historial-ventas"></div>
+  </div>
+
+  <!-- TICKET -->
+  <div id="ticket-print"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIDAaZY0g3EQ6a_iPhyt87_3QXj30p6zY",
+      authDomain: "muelle817-c62df.firebaseapp.com",
+      databaseURL: "https://muelle817-c62df-default-rtdb.firebaseio.com",
+      projectId: "muelle817-c62df",
+      storageBucket: "muelle817-c62df.firebasestorage.app",
+      messagingSenderId: "641825272212",
+      appId: "1:641825272212:web:b96a054561398eaf22df81"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function login() {
+      if (document.getElementById('username').value === "usuario1" && 
+          document.getElementById('password').value.toUpperCase() === "ADMIN") {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        loadData();
+      } else {
+        alert("Usuario o contraseña incorrectos");
+      }
+    }
+
+    function logout() {
+      document.getElementById('main-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+    }
+
+    function loadData() {
+      db.ref('pedidosListos').on('value', snapshot => {
+        const div = document.getElementById('pedidos-listos');
+        div.innerHTML = '';
+
+        if (!snapshot.exists()) {
+          div.innerHTML = '<p class="text-center py-10 text-gray-500">No hay pedidos listos</p>';
+          return;
+        }
+
+        snapshot.forEach(child => {
+          const order = child.val();
+          let itemsHtml = order.items.map(item => `
+            <div class="py-2 border-b border-gray-700">
+              <strong>${item.quantity} × ${item.name}</strong>
+              ${item.note ? `<p class="text-amber-300 text-sm">📝 ${item.note}</p>` : ''}
+            </div>`).join('');
+
+          div.innerHTML += `
+            <div class="order">
+              <span class="mesa">Mesa ${order.mesa}</span><br>
+              <small>${order.timestamp}</small>
+              <div class="my-4">${itemsHtml}</div>
+              <h3 class="text-2xl font-bold">Total: $${order.total}</h3>
+              <button onclick="registrarVenta('${child.key}')" class="btn-venta">
+                ✅ REGISTRAR VENTA E IMPRIMIR
+              </button>
+            </div>`;
+        });
+      });
+    }
+
+    function registrarVenta(orderId) {
+      if (!confirm("¿Registrar venta e imprimir ticket?")) return;
+
+      db.ref('pedidosListos/' + orderId).once('value')
+        .then(snapshot => {
+          const order = snapshot.val();
+          if (!order) throw new Error("Pedido no encontrado");
+
+          const ventaId = Date.now();
+
+          // Guardar venta
+          return db.ref('ventas/' + ventaId).set({
+            ...order,
+            fechaVenta: new Date().toLocaleString('es-MX'),
+            ventaId: ventaId
+          });
+        })
+        .then(() => {
+          // Imprimir ticket
+          db.ref('pedidosListos/' + orderId).once('value')
+            .then(snapshot => {
+              imprimirTicket(snapshot.val());
+              // Eliminar de listos
+              return db.ref('pedidosListos/' + orderId).remove();
+            });
+        })
+        .then(() => {
+          alert("✅ Venta registrada y ticket impreso correctamente");
+        })
+        .catch(error => {
+          console.error(error);
+          alert("Error al registrar la venta: " + error.message);
+        });
+    }
+
+    function imprimirTicket(order) {
+      let itemsText = order.items.map(item => 
+        `${item.quantity} x ${item.name} - $${(item.price * item.quantity)}`
+      ).join('<br>');
+
+      const ticketHTML = `
+        <div style="width:300px; margin:20px auto; padding:15px; border:1px dashed #000; font-family:monospace; font-size:13px;">
+          <h2 style="text-align:center; margin:5px 0;">BURGER 817</h2>
+          <p style="text-align:center;">============================</p>
+          <p><strong>Mesa:</strong> ${order.mesa}</p>
+          <p><strong>Fecha:</strong> ${order.timestamp}</p>
+          <p style="text-align:center;">============================</p>
+          ${itemsText}
+          <p style="text-align:center; margin:10px 0;">============================</p>
+          <h3 style="text-align:right; font-size:16px;">TOTAL: $${order.total}</h3>
+          <p style="text-align:center; margin-top:15px;">¡Gracias por su visita!</p>
+        </div>
+      `;
+
+      document.getElementById('ticket-print').innerHTML = ticketHTML;
+      window.print();
+    }
+  </script>
+</body>
+</html>
