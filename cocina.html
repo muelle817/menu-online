@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Cocina - Burger 817</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+    
+    body { 
+      font-family: 'Poppins', sans-serif; 
+      background: #0f0f0f; 
+      color: white; 
+      margin: 0; 
+      padding: 20px; 
+    }
+    h1 { 
+      color: #ff8c00; 
+      text-align: center; 
+      margin-bottom: 10px;
+      font-size: 2.8rem;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      border-bottom: 3px solid #ff8c00;
+      padding-bottom: 15px;
+    }
+    .order { 
+      background: #1a1a1a; 
+      margin: 20px auto;
+      padding: 25px; 
+      border-radius: 16px; 
+      border-left: 8px solid #ff8c00;
+      max-width: 850px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .mesa {
+      font-size: 1.9rem;
+      font-weight: bold;
+      color: #ff8c00;
+    }
+    .complete-btn { 
+      background: #22c55e; 
+      color: black; 
+      border: none; 
+      padding: 14px 28px; 
+      border-radius: 10px; 
+      cursor: pointer; 
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .complete-btn:hover {
+      background: #86efac;
+    }
+    .item {
+      padding: 10px 0;
+      border-bottom: 1px solid #333;
+    }
+    .note {
+      color: #ffcc80;
+      font-size: 0.95rem;
+      margin-top: 4px;
+    }
+    .no-orders {
+      text-align: center;
+      color: #888;
+      font-size: 1.3rem;
+      padding: 60px 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🍔 Panel de Cocina - Burger 817</h1>
+    <p style="color:#aaa;">Pedidos en tiempo real</p>
+  </div>
+  
+  <div id="orders"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIDAaZY0g3EQ6a_iPhyt87_3QXj30p6zY",
+      authDomain: "muelle817-c62df.firebaseapp.com",
+      databaseURL: "https://muelle817-c62df-default-rtdb.firebaseio.com",
+      projectId: "muelle817-c62df",
+      storageBucket: "muelle817-c62df.firebasestorage.app",
+      messagingSenderId: "641825272212",
+      appId: "1:641825272212:web:b96a054561398eaf22df81"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function loadOrders() {
+      db.ref('pedidos').on('value', snapshot => {
+        const ordersDiv = document.getElementById('orders');
+        ordersDiv.innerHTML = '';
+
+        if (!snapshot.exists()) {
+          ordersDiv.innerHTML = `<p class="no-orders">No hay pedidos pendientes</p>`;
+          return;
+        }
+
+        let ordersArray = [];
+        snapshot.forEach(child => {
+          ordersArray.push({ id: child.key, ...child.val() });
+        });
+
+        ordersArray.sort((a, b) => b.id - a.id);
+
+        ordersArray.forEach(order => {
+          let itemsHtml = order.items.map(item => `
+            <div class="item">
+              <strong>${item.quantity} × ${item.name}</strong> — $${item.price * item.quantity}
+              ${item.note ? `<p class="note">📝 ${item.note}</p>` : ''}
+            </div>
+          `).join('');
+
+          ordersDiv.innerHTML += `
+            <div class="order">
+              <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:15px;">
+                <div>
+                  <span class="mesa">MESA ${order.mesa}</span>
+                  <p style="color:#aaa; margin-top:5px;">${order.timestamp}</p>
+                </div>
+                <button class="complete-btn" onclick="completeOrder('${order.id}')">
+                  <i class="fas fa-check"></i> PEDIDO LISTO
+                </button>
+              </div>
+              
+              <div style="margin: 15px 0;">
+                ${itemsHtml}
+              </div>
+              
+              <strong style="font-size:1.4rem;">Total: $${order.total}</strong>
+            </div>`;
+        });
+      });
+    }
+
+    function completeOrder(orderId) {
+      if (confirm("¿Marcar este pedido como LISTO y notificar al cliente?")) {
+        db.ref('pedidos/' + orderId).remove()
+          .then(() => {
+            console.log("Pedido marcado como listo");
+          })
+          .catch(err => alert("Error: " + err));
+      }
+    }
+
+    // Iniciar
+    loadOrders();
+  </script>
+</body>
+</html>

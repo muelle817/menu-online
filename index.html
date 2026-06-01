@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Burger 817 • Menú Digital</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@400;500&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-image: url('FONDOT.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: white;
+        }
+        .logo-font { font-family: 'Playfair Display', serif; }
+
+        .quantity-control {
+            background: #ff8c00;
+            color: black;
+            padding: 6px 14px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .note-btn {
+            background: #3b82f6;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            font-size: 0.9rem;
+        }
+
+        #ready-notification {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.97);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<header class="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-xl">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+        <img src="logo.png" alt="Burger 817" class="h-16">
+        <button onclick="openCart()" class="relative text-3xl hover:text-orange-400 transition">
+            🛒 <span id="cart-count" class="absolute -top-1 -right-1 bg-orange-500 text-black text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center">0</span>
+        </button>
+    </div>
+</header>
+
+<main class="pt-28 pb-20 px-4 max-w-5xl mx-auto">
+    <h1 class="logo-font text-5xl sm:text-6xl text-center text-[#ff8c00] mb-2 tracking-widest">BURGER 817</h1>
+    <p id="mesa-info" class="text-center text-xl mb-10 text-orange-300"></p>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="categories"></div>
+</main>
+
+<!-- NOTIFICACIÓN PEDIDO LISTO -->
+<div id="ready-notification">
+    <div class="max-w-md">
+        <h2 class="text-5xl font-bold text-green-400 mb-6">¡TU PEDIDO ESTÁ LISTO! 🎉</h2>
+        <p class="text-2xl mb-8">Por favor acércate al mostrador a recogerlo</p>
+        <button onclick="dismissNotification()" 
+                class="bg-orange-500 hover:bg-orange-600 text-black font-bold text-xl px-12 py-5 rounded-2xl w-full">
+            Entendido
+        </button>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80">
+    <div class="rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-hidden relative border border-white/20 shadow-2xl bg-zinc-900">
+        <button onclick="closeModal()" class="absolute top-4 right-4 text-5xl text-white hover:text-orange-400 z-50">×</button>
+        <div class="p-8 overflow-y-auto max-h-[85vh]" id="modal-content"></div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIDAaZY0g3EQ6a_iPhyt87_3QXj30p6zY",
+      authDomain: "muelle817-c62df.firebaseapp.com",
+      databaseURL: "https://muelle817-c62df-default-rtdb.firebaseio.com",
+      projectId: "muelle817-c62df",
+      storageBucket: "muelle817-c62df.firebasestorage.app",
+      messagingSenderId: "641825272212",
+      appId: "1:641825272212:web:b96a054561398eaf22df81"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let cart = [];
+    let mesaActual = null;
+    let currentCategory = "";
+
+    const urlParams = new URLSearchParams(window.location.search);
+    mesaActual = urlParams.get('mesa') || "Sin mesa";
+
+    function mostrarMesa() {
+        document.getElementById('mesa-info').innerHTML = `📍 <strong>Mesa ${mesaActual}</strong>`;
+    }
+
+    function renderCategories() {
+        document.getElementById('categories').innerHTML = `
+            <button onclick="openCategory('hamburguesas')" class="category-card w-full aspect-video relative rounded-3xl overflow-hidden shadow-2xl">
+                <img src="https://via.placeholder.com/600x400?text=HAMBURGUESAS" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 flex items-end pb-8">
+                    <h2 class="logo-font text-4xl text-center w-full text-white drop-shadow-2xl">HAMBURGUESAS</h2>
+                </div>
+            </button>
+            <button onclick="openCategory('acompanamientos')" class="category-card w-full aspect-video relative rounded-3xl overflow-hidden shadow-2xl">
+                <img src="https://via.placeholder.com/600x400?text=PAPAS" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 flex items-end pb-8">
+                    <h2 class="logo-font text-4xl text-center w-full text-white drop-shadow-2xl">PAPAS Y ACOMPAÑAMIENTOS</h2>
+                </div>
+            </button>
+        `;
+    }
+
+    function openCategory(id) {
+        currentCategory = id;
+        let html = `<h2 class="logo-font text-5xl text-center mb-10 text-[#ff8c00]">${id === "hamburguesas" ? "HAMBURGUESAS" : "PAPAS Y ACOMPAÑAMIENTOS"}</h2><div class="space-y-6">`;
+
+        let items = [];
+        if (id === "hamburguesas") {
+            items = [
+                {name: "Clásica (Res)", price: 95},
+                {name: "Doble Carne", price: 135},
+                {name: "Cheeseburger", price: 105},
+                {name: "Bacon BBQ", price: 125},
+                {name: "Chicken Crispy", price: 110},
+                {name: "Mexicana (Jalapeño)", price: 120}
+            ];
+        } else if (id === "acompanamientos") {
+            items = [
+                {name: "Papas Fritas", price: 45},
+                {name: "Papas con Queso", price: 65},
+                {name: "Papas con Tocino", price: 75},
+                {name: "Aros de Cebolla", price: 55},
+                {name: "Nuggets (6 piezas)", price: 70}
+            ];
+        }
+
+        html += items.map(item => {
+            const inCart = cart.find(i => i.name === item.name);
+            const qty = inCart ? inCart.quantity : 0;
+            const note = inCart ? inCart.note : "";
+
+            return `
+                <div class="flex justify-between items-center border-b border-white/20 pb-5">
+                    <div class="flex-1">
+                        <span class="text-lg font-medium">${item.name}</span><br>
+                        <span class="text-orange-400 font-bold">$${item.price}</span>
+                        ${note ? `<p class="text-sm text-orange-300 mt-1">📝 ${note}</p>` : ''}
+                    </div>
+                    <div class="flex items-center gap-3">
+                        ${qty > 0 ? `
+                            <div class="quantity-control">
+                                <button onclick="changeQty('${item.name}', -1)" class="font-bold text-xl">-</button>
+                                <span class="font-bold mx-4">${qty}</span>
+                                <button onclick="changeQty('${item.name}', 1)" class="font-bold text-xl">+</button>
+                            </div>
+                            <button onclick="addNote('${item.name}')" class="note-btn">Nota</button>
+                        ` : `
+                            <button onclick="addItem('${item.name}', ${item.price})" class="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-2xl font-bold">Agregar</button>
+                        `}
+                    </div>
+                </div>`;
+        }).join('');
+
+        html += `</div>`;
+        document.getElementById('modal-content').innerHTML = html;
+        document.getElementById('modal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('modal').classList.add('show'), 10);
+    }
+
+    function addItem(name, price) {
+        cart.push({name, price, quantity: 1, note: ""});
+        updateCartCount();
+        openCategory(currentCategory);
+    }
+
+    function changeQty(name, change) {
+        const item = cart.find(i => i.name === name);
+        if (item) {
+            item.quantity += change;
+            if (item.quantity < 1) cart = cart.filter(i => i.name !== name);
+        }
+        updateCartCount();
+        openCategory(currentCategory);
+    }
+
+    function addNote(name) {
+        const item = cart.find(i => i.name === name);
+        if (item) {
+            const newNote = prompt("Nota para " + name + ":", item.note || "");
+            if (newNote !== null) item.note = newNote.trim();
+            openCategory(currentCategory);
+        }
+    }
+
+    function updateCartCount() {
+        const total = cart.reduce((sum, item) => sum + item.quantity, 0);
+        document.getElementById('cart-count').textContent = total;
+    }
+
+    function openCart() {
+        let html = `<h2 class="logo-font text-4xl mb-6 text-center">Tu Pedido - Mesa ${mesaActual}</h2>`;
+        let total = 0;
+
+        cart.forEach(item => {
+            const itemTotal = item.price * item.quantity;
+            total += itemTotal;
+            html += `
+                <div class="py-4 border-b border-white/20">
+                    <div class="flex justify-between">
+                        <span>${item.name} ×${item.quantity}</span>
+                        <span class="font-bold">$${itemTotal}</span>
+                    </div>
+                    ${item.note ? `<p class="text-sm text-orange-300">Nota: ${item.note}</p>` : ''}
+                </div>`;
+        });
+
+        html += `<div class="text-3xl font-bold mt-8 text-center">Total: $${total}</div>`;
+        html += `<button onclick="confirmOrder()" class="w-full mt-6 bg-green-600 hover:bg-green-700 py-5 rounded-2xl text-xl font-bold">Enviar Pedido a Cocina</button>`;
+
+        document.getElementById('modal-content').innerHTML = html;
+        document.getElementById('modal').classList.remove('hidden');
+        setTimeout(() => document.getElementById('modal').classList.add('show'), 10);
+    }
+
+    function confirmOrder() {
+        if (cart.length === 0) return alert("El carrito está vacío");
+
+        const order = {
+            id: Date.now(),
+            mesa: mesaActual,
+            items: cart,
+            total: cart.reduce((sum, i) => sum + (i.price * i.quantity), 0),
+            timestamp: new Date().toLocaleString('es-MX')
+        };
+
+        db.ref('pedidos/' + order.id).set(order).then(() => {
+            alert(`✅ Pedido enviado a cocina`);
+            cart = [];
+            updateCartCount();
+            closeModal();
+        });
+    }
+
+    function closeModal() {
+        const modal = document.getElementById('modal');
+        modal.classList.remove('show');
+        setTimeout(() => modal.classList.add('hidden'), 400);
+    }
+
+    function dismissNotification() {
+        document.getElementById('ready-notification').style.display = 'none';
+    }
+
+    // Escuchar cuando la cocina marca el pedido como listo
+    function listenForOrderReady() {
+        db.ref('pedidos').on('child_removed', (snapshot) => {
+            const order = snapshot.val();
+            if (order && order.mesa == mesaActual) {
+                document.getElementById('ready-notification').style.display = 'flex';
+                new Audio('https://assets.mixkit.co/sfx/preview/2965/2965.wav').play();
+            }
+        });
+    }
+
+    // Iniciar
+    mostrarMesa();
+    renderCategories();
+    listenForOrderReady();
+</script>
+</body>
+</html>
