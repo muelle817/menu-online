@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ventas - Burger 817</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+    body { font-family: 'Poppins', sans-serif; background: #0a0a0a; color: white; margin:0; padding:15px; }
+    h1 { color: #ff8c00; }
+    .venta { 
+      background: #1f1f1f; 
+      margin: 15px 0; 
+      padding: 20px; 
+      border-radius: 16px; 
+      border-left: 6px solid #22c55e;
+    }
+    .mesa { font-size: 1.7rem; font-weight: bold; color: #22c55e; }
+    .btn-eliminar { 
+      background: #ef4444; 
+      color: white; 
+      padding: 10px 20px; 
+      border: none; 
+      border-radius: 8px; 
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
+    <div class="bg-zinc-900 p-10 rounded-3xl w-full max-w-md">
+      <h1 class="text-5xl font-bold text-center text-orange-500 mb-8">BURGER 817</h1>
+      <h2 class="text-2xl text-center mb-6">Historial de Ventas</h2>
+      <input id="username" type="text" value="usuario1" class="w-full px-5 py-4 bg-zinc-800 rounded-2xl mb-4">
+      <input id="password" type="password" placeholder="Contraseña" class="w-full px-5 py-4 bg-zinc-800 rounded-2xl mb-6">
+      <button onclick="login()" class="w-full bg-orange-500 text-black py-4 rounded-2xl font-bold text-lg">
+        INICIAR SESIÓN
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main-screen" class="hidden">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-4xl font-bold">📊 HISTORIAL DE VENTAS</h1>
+      <div>
+        <button onclick="logout()" class="bg-red-600 px-5 py-2 rounded-xl mr-2">Cerrar Sesión</button>
+        <button onclick="cargarVentas()" class="bg-blue-600 px-5 py-2 rounded-xl">Actualizar</button>
+      </div>
+    </div>
+
+    <div class="bg-zinc-900 p-5 rounded-2xl mb-6">
+      <h2 id="total-ventas" class="text-3xl font-bold text-green-400 text-center"></h2>
+    </div>
+
+    <div id="lista-ventas"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCIDAaZY0g3EQ6a_iPhyt87_3QXj30p6zY",
+      authDomain: "muelle817-c62df.firebaseapp.com",
+      databaseURL: "https://muelle817-c62df-default-rtdb.firebaseio.com",
+      projectId: "muelle817-c62df",
+      storageBucket: "muelle817-c62df.firebasestorage.app",
+      messagingSenderId: "641825272212",
+      appId: "1:641825272212:web:b96a054561398eaf22df81"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    function login() {
+      if (document.getElementById('username').value === "usuario1" && 
+          document.getElementById('password').value.toUpperCase() === "ADMIN") {
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('main-screen').classList.remove('hidden');
+        cargarVentas();
+      } else {
+        alert("Usuario o contraseña incorrectos");
+      }
+    }
+
+    function logout() {
+      document.getElementById('main-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+    }
+
+    function cargarVentas() {
+      db.ref('ventas').once('value', snapshot => {
+        const div = document.getElementById('lista-ventas');
+        div.innerHTML = '';
+        let totalGeneral = 0;
+
+        if (!snapshot.exists()) {
+          div.innerHTML = '<p class="text-center py-20 text-gray-500">No hay ventas registradas</p>';
+          document.getElementById('total-ventas').innerHTML = 'Total Vendido: $0';
+          return;
+        }
+
+        snapshot.forEach(child => {
+          const venta = child.val();
+          const ventaId = child.key;
+          totalGeneral += venta.total || 0;
+
+          let itemsHtml = venta.items.map(item => `
+            <div class="py-1 text-sm">${item.quantity} × ${item.name}</div>
+          `).join('');
+
+          div.innerHTML += `
+            <div class="venta">
+              <div class="flex justify-between">
+                <div>
+                  <span class="mesa">Mesa ${venta.mesa}</span><br>
+                  <small>${venta.fechaVenta || venta.timestamp}</small>
+                </div>
+                <span class="text-2xl font-bold text-green-400">$${venta.total}</span>
+              </div>
+              <div class="my-4">${itemsHtml}</div>
+              <button onclick="eliminarVenta('${ventaId}')" class="btn-eliminar">
+                🗑 Eliminar Venta
+              </button>
+            </div>`;
+        });
+
+        document.getElementById('total-ventas').innerHTML = `Total Vendido: <strong>$${totalGeneral}</strong>`;
+      });
+    }
+
+    function eliminarVenta(ventaId) {
+      if (confirm("¿Eliminar esta venta permanentemente?")) {
+        db.ref('ventas/' + ventaId).remove()
+          .then(() => {
+            alert("Venta eliminada correctamente");
+            cargarVentas();        // Recargar manualmente
+          })
+          .catch(error => {
+            alert("Error al eliminar: " + error.message);
+          });
+      }
+    }
+  </script>
+</body>
+</html>
