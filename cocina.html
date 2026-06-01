@@ -23,12 +23,6 @@
       margin-bottom: 10px;
       font-size: 2.8rem;
     }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 3px solid #ff8c00;
-      padding-bottom: 15px;
-    }
     .order { 
       background: #1a1a1a; 
       margin: 20px auto;
@@ -36,48 +30,23 @@
       border-radius: 16px; 
       border-left: 8px solid #ff8c00;
       max-width: 850px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
     }
-    .mesa {
-      font-size: 1.9rem;
-      font-weight: bold;
-      color: #ff8c00;
-    }
+    .mesa { font-size: 1.9rem; font-weight: bold; color: #ff8c00; }
     .complete-btn { 
       background: #22c55e; 
       color: black; 
+      padding: 14px 32px; 
       border: none; 
-      padding: 14px 28px; 
       border-radius: 10px; 
-      cursor: pointer; 
       font-weight: bold;
       font-size: 1.1rem;
     }
-    .complete-btn:hover {
-      background: #86efac;
-    }
-    .item {
-      padding: 10px 0;
-      border-bottom: 1px solid #333;
-    }
-    .note {
-      color: #ffcc80;
-      font-size: 0.95rem;
-      margin-top: 4px;
-    }
-    .no-orders {
-      text-align: center;
-      color: #888;
-      font-size: 1.3rem;
-      padding: 60px 20px;
-    }
+    .note { color: #ffcc80; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>🍔 Panel de Cocina - Burger 817</h1>
-    <p style="color:#aaa;">Pedidos en tiempo real</p>
-  </div>
+  <h1>🍔 Panel de Cocina - Burger 817</h1>
+  <p style="text-align:center; color:#aaa;">Pedidos pendientes</p>
   
   <div id="orders"></div>
 
@@ -101,7 +70,7 @@
         ordersDiv.innerHTML = '';
 
         if (!snapshot.exists()) {
-          ordersDiv.innerHTML = `<p class="no-orders">No hay pedidos pendientes</p>`;
+          ordersDiv.innerHTML = `<p style="text-align:center; padding:60px; color:#666;">No hay pedidos pendientes</p>`;
           return;
         }
 
@@ -114,45 +83,47 @@
 
         ordersArray.forEach(order => {
           let itemsHtml = order.items.map(item => `
-            <div class="item">
-              <strong>${item.quantity} × ${item.name}</strong> — $${item.price * item.quantity}
-              ${item.note ? `<p class="note">📝 ${item.note}</p>` : ''}
+            <div class="py-2 border-b border-gray-700">
+              <strong>${item.quantity} × ${item.name}</strong>
+              ${item.note ? `<p class="note text-sm">📝 ${item.note}</p>` : ''}
             </div>
           `).join('');
 
           ordersDiv.innerHTML += `
             <div class="order">
-              <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:15px;">
+              <div class="flex justify-between items-start">
                 <div>
-                  <span class="mesa">MESA ${order.mesa}</span>
-                  <p style="color:#aaa; margin-top:5px;">${order.timestamp}</p>
+                  <span class="mesa">MESA ${order.mesa}</span><br>
+                  <small>${order.timestamp}</small>
                 </div>
-                <button class="complete-btn" onclick="completeOrder('${order.id}')">
-                  <i class="fas fa-check"></i> PEDIDO LISTO
+                <button class="complete-btn" onclick="marcarListo('${order.id}')">
+                  <i class="fas fa-check"></i> LISTO
                 </button>
               </div>
-              
-              <div style="margin: 15px 0;">
-                ${itemsHtml}
-              </div>
-              
-              <strong style="font-size:1.4rem;">Total: $${order.total}</strong>
+              <div style="margin:15px 0;">${itemsHtml}</div>
+              <strong>Total: $${order.total}</strong>
             </div>`;
         });
       });
     }
 
-    function completeOrder(orderId) {
-      if (confirm("¿Marcar este pedido como LISTO y notificar al cliente?")) {
-        db.ref('pedidos/' + orderId).remove()
-          .then(() => {
-            console.log("Pedido marcado como listo");
-          })
-          .catch(err => alert("Error: " + err));
+    // Función clave: Mover pedido de Cocina a Caja
+    function marcarListo(orderId) {
+      if (confirm("¿Marcar como LISTO y enviar a Caja?")) {
+        db.ref('pedidos/' + orderId).once('value', snapshot => {
+          const order = snapshot.val();
+          
+          // Guardar en pedidosListos (para Caja)
+          db.ref('pedidosListos/' + orderId).set(order)
+            .then(() => {
+              // Eliminar de pedidos (Cocina)
+              db.ref('pedidos/' + orderId).remove();
+              alert("Pedido enviado a Caja correctamente");
+            });
+        });
       }
     }
 
-    // Iniciar
     loadOrders();
   </script>
 </body>
